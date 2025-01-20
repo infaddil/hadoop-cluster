@@ -166,4 +166,4 @@ This beginner's tutorial is written purely for educational purposes. This reposi
 * step 22: Stop the Hadoop and verify.
     * master terminal> stop-yarn.sh
     * master terminal> stop-dfs.sh
-* step 23: Shutdown all VMs.
+* step 23: Shutdown all VMs.  
