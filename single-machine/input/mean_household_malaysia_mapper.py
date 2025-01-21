@@ -21,7 +21,7 @@ for line in sys.stdin:
         print(f"{year},{strata},{category}\t{monthly_income}")
 
         # Optionally, also emit a partial key if you want aggregated by Category alone
-        print(f"{category}\t{monthly_income}")
+        #print(f"{category}\t{monthly_income}")
     except (ValueError, IndexError):
         # Skip lines with bad or incomplete data
         continue
