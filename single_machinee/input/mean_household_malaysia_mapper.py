@@ -18,7 +18,7 @@ for line in sys.stdin:
 
         # Emit a key that includes Year, Strata, and Category
         # so you can later parse "2019,Urban,Top 20%", etc.
-        print(f"{year},{strata},{category}\t{monthly_income}")
+        print("{},{},{}\t{}".format(year, strata, category, monthly_income))
 
         # Optionally, also emit a partial key if you want aggregated by Category alone
         #print(f"{category}\t{monthly_income}")
