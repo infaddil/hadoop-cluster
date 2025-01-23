@@ -22,6 +22,8 @@ services:
     image: amnrz/hadoop-datanode:v1
     container_name: datanode
     restart: always
+    ports:
+      - 9864:9864
     volumes:
       - hadoop_datanode:/hadoop/dfs/data
     environment:
@@ -36,6 +38,8 @@ services:
     image: amnrz/hadoop-resourcemanager:v1
     container_name: resourcemanager
     restart: always
+    ports:
+      - 8088:8088
     environment:
       SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864"
     env_file:
@@ -48,6 +52,8 @@ services:
     image: amnrz/hadoop-nodemanager:v1
     container_name: nodemanager
     restart: always
+    ports:
+      - 8042:8042
     environment:
       SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
     env_file:
@@ -60,6 +66,8 @@ services:
     image: amnrz/hadoop-historyserver:v1
     container_name: historyserver
     restart: always
+    ports:
+      - 19888:19888
     environment:
       SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
     volumes:
