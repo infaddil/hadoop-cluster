@@ -65,7 +65,8 @@ def visualize_income_time_series(csv_file):
             all_years,
             y_values,
             marker='o',
-            label=f"{strata} {category}"
+            label="{} {}".format(strata, category)
+
         )
 
     # Labeling and layout
