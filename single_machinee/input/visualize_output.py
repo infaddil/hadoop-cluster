@@ -65,8 +65,7 @@ def visualize_income_time_series(csv_file):
             all_years,
             y_values,
             marker='o',
-            label="{} {}".format(strata, category)
-
+            label=f"{strata} {category}"
         )
 
     # Labeling and layout
@@ -80,7 +79,7 @@ def visualize_income_time_series(csv_file):
     # Save the figure
     out_file = "/tmp/mean_household_income_timeseries.png"
     plt.savefig(out_file)
-    print("Saved chart to {}".format(out_file))
+    print(f"Saved chart to {out_file}")
 
 if __name__ == "__main__":
     # Point to your updated CSV. Adjust the path or filename as needed.
