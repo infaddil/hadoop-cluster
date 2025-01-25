@@ -1,49 +1,49 @@
-#!/usr/bin/python3
+# mean_householf_malaysia_mapper_MPI.py
 from mpi4py import MPI
 
-def mapper(lines):
-    # Perform the mapping task
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+def process_lines(lines):
     results = []
     for line in lines:
-        if line.startswith('Strata'):
+        if line.startswith("Strata"):
             continue
-        fields = line.strip().split(',')
+        fields = line.strip().split(",")
         if len(fields) != 4:
             continue
         _, category, _, income = fields
         try:
             income = float(income)
-            results.append((category, income))
+            results.append(f"{category}\t{income}")
         except ValueError:
             continue
     return results
 
-# Initialize MPI
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+if __name__ == "__main__":
+    input_file = "/input/input_mean_household_malaysia.csv"
 
-if rank == 0:
-    # Master process: Load and distribute the data
-    input_file = '/input/input_mean_household_malaysia.csv'  # Ensure path is correct
-    with open(input_file, 'r') as f:
-        data = f.readlines()
-    chunks = [data[i::size] for i in range(size)]  # Distribute data across processes
-else:
-    chunks = None
+    if rank == 0:
+        # Master reads the file and splits lines
+        with open(input_file, "r") as f:
+            lines = f.readlines()
+        chunks = [lines[i::size] for i in range(size)]
+    else:
+        chunks = None
 
-# Scatter chunks of data to workers
-chunk = comm.scatter(chunks, root=0)
+    # Scatter chunks to processes
+    chunk = comm.scatter(chunks, root=0)
 
-# Map phase: Each worker processes its chunk
-mapped_results = mapper(chunk)
+    # Process lines in each process
+    local_results = process_lines(chunk)
 
-# Gather the mapped results at the master
-gathered_results = comm.gather(mapped_results, root=0)
+    # Gather results from all processes
+    gathered_results = comm.gather(local_results, root=0)
 
-if rank == 0:
-    # Master process: Combine and save results
-    all_results = [item for sublist in gathered_results for item in sublist]
-    with open('mapped_output.txt', 'w') as f:
-        for key, value in all_results:
-            f.write(f"{key}\t{value}\n")
+    if rank == 0:
+        # Combine results and write to output
+        with open("/input/mapped_output.txt", "w") as f:
+            for sublist in gathered_results:
+                for result in sublist:
+                    f.write(result + "\n")
