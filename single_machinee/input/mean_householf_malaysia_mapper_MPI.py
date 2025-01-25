@@ -23,7 +23,7 @@ size = comm.Get_size()
 
 if rank == 0:
     # Master process: Split data and distribute
-    with open('input_mean_household_malaysia.csv', 'r') as f:
+    with open('/input/input_mean_household_malaysia.csv', 'r') as f:
         data = f.readlines()
     chunks = [data[i::size] for i in range(size)]
 else:
