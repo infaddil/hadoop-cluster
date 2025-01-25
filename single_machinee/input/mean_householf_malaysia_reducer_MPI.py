@@ -1,38 +1,39 @@
-# MPI Reducer Code
-# Save this as `mean_household_malaysia_reducer_MPI.py`
-
+# mean_householf_malaysia_reducer_MPI.py
 from mpi4py import MPI
-import sys
+import os
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-
-def reducer(input_file):
+def reducer(lines):
     results = {}
-    with open(input_file, 'r') as f:
-        for line in f:
-            category, income = line.strip().split("\t")
-            income = float(income)
-            if category in results:
-                results[category].append(income)
-            else:
-                results[category] = [income]
+    for line in lines:
+        category, income = line.strip().split("\t")
+        income = float(income)
+        if category in results:
+            results[category].append(income)
+        else:
+            results[category] = [income]
 
     # Calculate averages
     averages = {category: sum(incomes) / len(incomes) for category, incomes in results.items()}
     return averages
 
-
 if __name__ == "__main__":
-    input_file = 'mapper_output.txt'
+    input_file = '/input/mapped_output.txt'  # Ensure path is consistent
+
+    if not os.path.exists(input_file):
+        if rank == 0:
+            print(f"Error: Input file {input_file} does not exist.")
+        sys.exit(1)
 
     if rank == 0:
+        # Read all lines from the input file
         with open(input_file, 'r') as f:
             lines = f.readlines()
 
-        # Split the lines among all ranks
+        # Split lines evenly among all processes
         chunks = [lines[i::size] for i in range(size)]
     else:
         chunks = None
@@ -40,28 +41,26 @@ if __name__ == "__main__":
     # Scatter chunks to all processes
     chunk = comm.scatter(chunks, root=0)
 
-    # Write the chunk to a temporary file
-    temp_file = f'temp_reducer_file_{rank}.txt'
-    with open(temp_file, 'w') as f:
-        f.writelines(chunk)
+    # Perform reduction on the received chunk
+    partial_results = reducer(chunk)
 
-    # Perform reduction
-    partial_results = reducer(temp_file)
-
-    # Gather results at rank 0
+    # Gather partial results from all processes at rank 0
     gathered_results = comm.gather(partial_results, root=0)
 
     if rank == 0:
+        # Combine results from all processes
         final_results = {}
         for result in gathered_results:
-            for category, avg in result.items():
+            for category, incomes in result.items():
                 if category in final_results:
-                    final_results[category].append(avg)
+                    final_results[category].extend(incomes)
                 else:
-                    final_results[category] = [avg]
+                    final_results[category] = incomes
 
-        # Final averages
-        with open('reducer_output.txt', 'w') as f:
-            for category, averages in final_results.items():
-                overall_avg = sum(averages) / len(averages)
+        # Calculate overall averages
+        with open('/input/reducer_output.txt', 'w') as f:
+            for category, incomes in final_results.items():
+                overall_avg = sum(incomes) / len(incomes)
                 f.write(f"{category}\t{overall_avg}\n")
+
+        print("Reducer operation completed. Output saved to reducer_output.txt.")
