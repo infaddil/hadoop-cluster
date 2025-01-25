@@ -1,20 +1,17 @@
 /*
- * MeanHouseholdMalaysiaReducerMPI.java
+ * MeanHouseholdMalaysiaReducerMPI.java (Corrected for MPJ Express + Java 8)
  *
- * Another contrived MPI program that reads key-value lines
- * like "year\tincome", distributed among ranks, then each rank partially
- * accumulates sums, then rank 0 merges them and prints final <year\tavg>
- *
- * This is HPC code, not typical Hadoop approach. We do it because you demanded
- * "mapper" and "reducer" in Java for MPI.
+ * Reads "year\tincome" lines from STDIN at rank 0, distributes them,
+ * each rank partially accumulates sums by year, then Gatherv merges at rank 0,
+ * final average is printed by rank 0 to STDOUT.
  */
 
 import mpi.MPI;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class MeanHouseholdMalaysiaReducerMPI {
 
@@ -26,8 +23,7 @@ public class MeanHouseholdMalaysiaReducerMPI {
         ArrayList<String> lines = new ArrayList<>();
 
         if (rank == 0) {
-            // read lines from STDIN
-            // e.g. "year\tincome"
+            // read from STDIN
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
             String ln;
             while ((ln = br.readLine()) != null) {
@@ -35,47 +31,49 @@ public class MeanHouseholdMalaysiaReducerMPI {
             }
         }
 
-        // Distribute lines to all ranks (round-robin or the same approach as mapper)
+        // broadcast line count
         String[] allLines = lines.toArray(new String[0]);
         int total = allLines.length;
-        int[] totalCount = new int[1];
+        int[] totalArr = new int[1];
         if (rank == 0) {
-            totalCount[0] = total;
+            totalArr[0] = total;
         }
-        MPI.COMM_WORLD.Bcast(totalCount, 0, 1, MPI.INT, 0);
+        MPI.COMM_WORLD.Bcast(totalArr, 0, 1, MPI.INT, 0);
+        total = totalArr[0];
 
-        int localCount = totalCount[0] / size;
-        int remainder = totalCount[0] % size;
+        int baseCount = total / size;
+        int remainder = total % size;
+        int myCount = baseCount + ((rank < remainder) ? 1 : 0);
+
         ArrayList<String> localLines = new ArrayList<>();
         if (rank == 0) {
             int idx = 0;
             for (int r = 0; r < size; r++) {
-                int ctsend = localCount + ((r < remainder) ? 1 : 0);
+                int sendCount = baseCount + ((r < remainder) ? 1 : 0);
                 if (r == 0) {
-                    for (int c = 0; c < ctsend; c++) {
+                    for (int i = 0; i < sendCount; i++) {
                         localLines.add(allLines[idx++]);
                     }
                 } else {
-                    String[] subset = new String[ctsend];
-                    for (int c = 0; c < ctsend; c++) {
-                        subset[c] = allLines[idx++];
+                    String[] subset = new String[sendCount];
+                    for (int i = 0; i < sendCount; i++) {
+                        subset[i] = allLines[idx++];
                     }
-                    MPI.COMM_WORLD.Send(subset, 0, ctsend, MPI.OBJECT, r, 77);
+                    MPI.COMM_WORLD.Send(subset, 0, sendCount, MPI.OBJECT, r, 77);
                 }
             }
         } else {
-            int ctrecv = localCount + ((rank < remainder) ? 1 : 0);
-            if (ctrecv > 0) {
-                String[] subset = new String[ctrecv];
-                MPI.COMM_WORLD.Recv(subset, 0, ctrecv, MPI.OBJECT, 0, 77);
+            if (myCount > 0) {
+                String[] subset = new String[myCount];
+                MPI.COMM_WORLD.Recv(subset, 0, myCount, MPI.OBJECT, 0, 77);
                 for (String s : subset) {
                     localLines.add(s);
                 }
             }
         }
 
-        // local reduce
-        // We'll accumulate sums by year
+        // local reduce: sum by year
+        // lines are "year\tincome"
         HashMap<String, Double> sumMap = new HashMap<>();
         HashMap<String, Integer> countMap = new HashMap<>();
 
@@ -83,9 +81,8 @@ public class MeanHouseholdMalaysiaReducerMPI {
             String[] parts = ln.split("\t");
             if (parts.length < 2) continue;
             String year = parts[0];
-            String incStr = parts[1];
             try {
-                double inc = Double.parseDouble(incStr);
+                double inc = Double.parseDouble(parts[1]);
                 sumMap.put(year, sumMap.getOrDefault(year, 0.0) + inc);
                 countMap.put(year, countMap.getOrDefault(year, 0) + 1);
             } catch (NumberFormatException e) {
@@ -93,44 +90,65 @@ public class MeanHouseholdMalaysiaReducerMPI {
             }
         }
 
-        // convert partial results into an array of "year sum count"
+        // Convert partial results to an array of "year\t sum \t count"
         ArrayList<String> partialList = new ArrayList<>();
         for (String y : sumMap.keySet()) {
             double s = sumMap.get(y);
             int c = countMap.get(y);
             partialList.add(y + "\t" + s + "\t" + c);
         }
-        String[] partialArr = partialList.toArray(new String[0]);
 
-        // gather them at rank 0
-        Object[] gatherArray = MPI.COMM_WORLD.Gather(partialArr, 0, partialArr.length, MPI.OBJECT, 0, MPI.OBJECT, 0);
+        String[] localArray = partialList.toArray(new String[0]);
+        int localLen = localArray.length;
 
+        // gather counts
+        int[] sendCountArr = new int[1];
+        sendCountArr[0] = localLen;
+        int[] recvCounts = new int[size];
+        MPI.COMM_WORLD.Gather(sendCountArr, 0, 1, MPI.INT,
+                              recvCounts, 0, 1, MPI.INT,
+                              0);
+
+        int totalGather = 0;
+        int[] displs = null;
         if (rank == 0) {
-            // combine
+            displs = new int[size];
+            for (int r = 0; r < size; r++) {
+                displs[r] = totalGather;
+                totalGather += recvCounts[r];
+            }
+        }
+
+        String[] reduceOutputs = null;
+        if (rank == 0 && totalGather > 0) {
+            reduceOutputs = new String[totalGather];
+        }
+
+        MPI.COMM_WORLD.Gatherv(localArray, 0, localLen, MPI.OBJECT,
+                               reduceOutputs, 0, recvCounts, displs, MPI.OBJECT,
+                               0);
+
+        if (rank == 0 && reduceOutputs != null) {
+            // combine final results
             HashMap<String, Double> globalSum = new HashMap<>();
             HashMap<String, Integer> globalCount = new HashMap<>();
 
-            for (Object o : gatherArray) {
-                if (o instanceof String[]) {
-                    String[] arr = (String[]) o;
-                    for (String rec : arr) {
-                        String[] sp = rec.split("\t");
-                        if (sp.length < 3) continue;
-                        String yy = sp[0];
-                        double ss = Double.parseDouble(sp[1]);
-                        int cc = Integer.parseInt(sp[2]);
-                        globalSum.put(yy, globalSum.getOrDefault(yy, 0.0) + ss);
-                        globalCount.put(yy, globalCount.getOrDefault(yy, 0) + cc);
-                    }
-                }
+            for (String rec : reduceOutputs) {
+                if (rec == null) continue;
+                String[] sp = rec.split("\t");
+                if (sp.length < 3) continue;
+                String yy = sp[0];
+                double s = Double.parseDouble(sp[1]);
+                int c = Integer.parseInt(sp[2]);
+                globalSum.put(yy, globalSum.getOrDefault(yy, 0.0) + s);
+                globalCount.put(yy, globalCount.getOrDefault(yy, 0) + c);
             }
 
-            // output final average
+            // print final average
             for (String year : globalSum.keySet()) {
                 double sumVal = globalSum.get(year);
-                int cVal = globalCount.get(year);
-                double avg = sumVal / cVal;
-                // Print to STDOUT: year \t avg
+                int cc = globalCount.get(year);
+                double avg = sumVal / cc;
                 System.out.println(year + "\t" + avg);
             }
         }
