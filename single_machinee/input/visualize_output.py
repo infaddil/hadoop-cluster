@@ -1,86 +1,53 @@
 #!/usr/bin/env python3
 
-import csv
 import matplotlib.pyplot as plt
 
-def visualize_income_time_series(csv_file):
-    """
-    Reads a CSV with columns:
-        Strata, Category, Year, Mean Monthly Household Gross Income
-    and plots a line chart from 2002 to 2019 showing Urban & Rural
-    incomes for Top 20%, Middle 40%, and Bottom 40% categories.
-    """
-    # Dictionary to hold data in the form:
-    #   data[(strata, category)][year] = mean_income
-    data = {}
+def visualize_output(output_file):
+    income_by_category = {}
 
-    # Read the CSV using DictReader so column headers match automatically
-    with open(csv_file, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                strata = row["Strata"].strip()
-                category = row["Category"].strip()
-                year_str = row["Year"].strip()
-                income_str = row["Mean Monthly Household Gross Income"].strip()
-
-                year = int(year_str)
-                income = float(income_str)
-
-                # Store in a nested dictionary keyed by (strata, category)
-                key = (strata, category)
-                if key not in data:
-                    data[key] = {}
-                data[key][year] = income
-
-            except (ValueError, KeyError):
-                # Skip lines that don't parse correctly or have missing columns
+    with open(output_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
                 continue
 
-    # We want to plot 6 possible lines: (Urban, Top 20%), (Urban, Middle 40%), etc.
-    combos = [
-        ("Urban", "Top 20%"),
-        ("Urban", "Middle 40%"),
-        ("Urban", "Bottom 40%"),
-        ("Rural", "Top 20%"),
-        ("Rural", "Middle 40%"),
-        ("Rural", "Bottom 40%")
-    ]
+            try:
+                # Example line: "2019,Urban,Bottom 40%\t3454.0"
+                key, avg_str = line.split('\t')  # split on tab
+                avg_income = float(avg_str.strip())
 
-    # Collect all the years that appear in your data, then sort them
-    all_years = set()
-    for combo_dict in data.values():
-        all_years.update(combo_dict.keys())
-    all_years = sorted(all_years)  # e.g. [2002, 2004, 2007, 2009, ...]
+                # Now parse the key: "2019,Urban,Bottom 40%"
+                parts = key.split(',')
+                if len(parts) == 3:
+                    year_str = parts[0].strip()
+                    strata_str = parts[1].strip()
+                    category_str = parts[2].strip()
 
-    # Create a figure and plot
-    plt.figure(figsize=(10, 6))
+                    # Compare with "2019" and "Urban"
+                    if year_str == "2019" and strata_str == "Urban":
+                        income_by_category[category_str] = avg_income
 
-    for (strata, category) in combos:
-        # For each year in sorted order, look up the income (or None if missing)
-        y_values = [data.get((strata, category), {}).get(y, None) for y in all_years]
+            except ValueError:
+                continue
 
-        # Plot this line if at least some data is present
-        plt.plot(
-            all_years,
-            y_values,
-            marker='o',
-            label=f"{strata} {category}"
-        )
+    # If no data matched year=2019 + strata=Urban
+    if not income_by_category:
+        print("No 'Urban, 2019' data found in reducer output.")
+        return
 
-    # Labeling and layout
-    plt.xlabel("Year")
-    plt.ylabel("Mean Monthly Household Income (MYR)")
-    plt.title("Mean Monthly Household Income by Strata & Category (2002–2019)")
-    plt.grid(True, axis='y', linestyle='--', alpha=0.5)
-    plt.legend()
-    plt.tight_layout()
+    # Plot Pie Chart
+    labels = list(income_by_category.keys())
+    sizes = [income_by_category[cat] for cat in labels]
 
-    # Save the figure
-    out_file = "/tmp/mean_household_income_timeseries.png"
-    plt.savefig(out_file)
-    print(f"Saved chart to {out_file}")
+    plt.figure(figsize=(6, 6))
+    plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
+    plt.title("Urban 2019 Income Distribution (B40, M40, T20)")
+    plt.axis('equal')
+    plt.savefig("/tmp/urban_2019_income_pie_chart_fixed.png")
+    print("Pie Chart saved as /tmp/urban_2019_income_pie_chart_fixed.png")
+
 
 if __name__ == "__main__":
-    # Point to your updated CSV. Adjust the path or filename as needed.
-    visualize_income_time_series("my_updated_income_data.csv")
+    # Make sure we point to the same 'output.txt'
+    visualize_output("output.txt")
+                    
