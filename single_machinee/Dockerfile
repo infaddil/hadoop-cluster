@@ -131,6 +131,7 @@ RUN wget https://repo1.maven.org/maven2/org/jfree/jfreechart/1.5.4/jfreechart-1.
 COPY input/MeanHouseholdMalaysiaMapperMPI.java /root/
 COPY input/MeanHouseholdMalaysiaReducerMPI.java /root/
 COPY input/VisualizeOutputJava.java /root/
+COPY input/input_mean_household_malaysia.csv /root/
 
 RUN javac -cp .:$MPJ_HOME/lib/mpj.jar:jfreechart-1.5.4.jar:jcommon-1.0.23.jar \
     MeanHouseholdMalaysiaMapperMPI.java MeanHouseholdMalaysiaReducerMPI.java VisualizeOutputJava.java
