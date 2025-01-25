@@ -5,17 +5,16 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-def calculate_averages(lines):
+def reducer(lines):
     results = {}
     for line in lines:
-        category, income = line.strip().split("\t")
-        income = float(income)
-        if category in results:
-            results[category].append(income)
+        key, value = line.strip().split("\t")
+        value = float(value)
+        if key in results:
+            results[key] += value
         else:
-            results[category] = [income]
-    averages = {category: sum(values) / len(values) for category, values in results.items()}
-    return averages
+            results[key] = value
+    return results
 
 if __name__ == "__main__":
     input_file = "/input/mapped_output.txt"
@@ -35,24 +34,23 @@ if __name__ == "__main__":
     # Scatter chunks to processes
     chunk = comm.scatter(chunks, root=0)
 
-    # Calculate averages for each process's chunk
-    partial_averages = calculate_averages(chunk)
+    # Perform reduction for each process's chunk
+    partial_results = reducer(chunk)
 
-    # Gather results at root process
-    gathered_averages = comm.gather(partial_averages, root=0)
+    # Gather results at rank 0
+    gathered_results = comm.gather(partial_results, root=0)
 
     if rank == 0:
-        # Combine all averages
+        # Combine all results
         final_results = {}
-        for partial in gathered_averages:
-            for category, avg in partial.items():
-                if category in final_results:
-                    final_results[category].append(avg)
+        for partial in gathered_results:
+            for key, value in partial.items():
+                if key in final_results:
+                    final_results[key] += value
                 else:
-                    final_results[category] = [avg]
+                    final_results[key] = value
 
-        # Write the final averages to output
+        # Write the final output to a file
         with open("/input/reducer_output.txt", "w") as f:
-            for category, averages in final_results.items():
-                overall_avg = sum(averages) / len(averages)
-                f.write(f"{category}\t{overall_avg}\n")
+            for key, value in final_results.items():
+                f.write(f"{key}\t{value}\n")
