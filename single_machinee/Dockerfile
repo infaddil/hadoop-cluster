@@ -132,6 +132,8 @@ COPY input/MeanHouseholdMalaysiaMapperMPI.java /root/
 COPY input/MeanHouseholdMalaysiaReducerMPI.java /root/
 COPY input/VisualizeOutputJava.java /root/
 COPY input/input_mean_household_malaysia.csv /root/
+COPY input/mean_household_malaysia_mapper.py /root
+COPY input/mean_household_malaysia_reducer.py /root
 
 RUN javac -cp .:$MPJ_HOME/lib/mpj.jar:jfreechart-1.5.4.jar:jcommon-1.0.23.jar \
     MeanHouseholdMalaysiaMapperMPI.java MeanHouseholdMalaysiaReducerMPI.java VisualizeOutputJava.java
