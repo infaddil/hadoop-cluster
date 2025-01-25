@@ -1,12 +1,8 @@
 #!/bin/bash
 
-echo -e "\n"
+# hadoop-env.sh might define JAVA_HOME, HADOOP_HOME, etc.
+export HADOOP_PREFIX=/usr/local/hadoop
 
-$HADOOP_HOME/sbin/start-dfs.sh
-
-echo -e "\n"
-
-$HADOOP_HOME/sbin/start-yarn.sh
-
-echo -e "\n"
-
+echo -e "\nStarting Hadoop..."
+$HADOOP_PREFIX/sbin/start-dfs.sh
+$HADOOP_PREFIX/sbin/start-yarn.sh
