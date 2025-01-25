@@ -5,7 +5,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-def process_lines(lines):
+def mapper(lines):
     results = []
     for line in lines:
         if line.startswith("Strata"):
@@ -13,10 +13,10 @@ def process_lines(lines):
         fields = line.strip().split(",")
         if len(fields) != 4:
             continue
-        _, category, _, income = fields
+        year, strata, group, income = fields
         try:
             income = float(income)
-            results.append(f"{category}\t{income}")
+            results.append(f"{year},{strata},{group}\t{income}")
         except ValueError:
             continue
     return results
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     chunk = comm.scatter(chunks, root=0)
 
     # Process lines in each process
-    local_results = process_lines(chunk)
+    local_results = mapper(chunk)
 
     # Gather results from all processes
     gathered_results = comm.gather(local_results, root=0)
