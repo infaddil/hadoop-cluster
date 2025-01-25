@@ -1,22 +1,11 @@
+# mean_householf_malaysia_reducer_MPI.py
 from mpi4py import MPI
-import os
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-# Ensure proper input path
-input_file = "/input/mapped_output.txt"
-
-if not os.path.exists(input_file):
-    if rank == 0:
-        print(f"Error: Input file {input_file} does not exist.")
-    # Exit gracefully
-    MPI.Finalize()
-    exit(1)
-
-
-def reducer(lines):
+def calculate_averages(lines):
     results = {}
     for line in lines:
         category, income = line.strip().split("\t")
@@ -25,43 +14,45 @@ def reducer(lines):
             results[category].append(income)
         else:
             results[category] = [income]
-
-    # Calculate averages
-    averages = {category: sum(incomes) / len(incomes) for category, incomes in results.items()}
+    averages = {category: sum(values) / len(values) for category, values in results.items()}
     return averages
 
-
 if __name__ == "__main__":
-    # Read the file at rank 0
-    if rank == 0:
-        with open(input_file, "r") as f:
-            lines = f.readlines()
+    input_file = "/input/mapped_output.txt"
 
-        # Scatter chunks of lines
-        chunks = [lines[i::size] for i in range(size)]
+    if rank == 0:
+        # Master reads the file and splits lines
+        try:
+            with open(input_file, "r") as f:
+                lines = f.readlines()
+            chunks = [lines[i::size] for i in range(size)]
+        except FileNotFoundError:
+            print(f"Error: Input file {input_file} does not exist.")
+            comm.Abort()
     else:
         chunks = None
 
+    # Scatter chunks to processes
     chunk = comm.scatter(chunks, root=0)
 
-    # Process the chunk using the reducer function
-    partial_results = reducer(chunk)
+    # Calculate averages for each process's chunk
+    partial_averages = calculate_averages(chunk)
 
-    # Gather partial results at rank 0
-    gathered_results = comm.gather(partial_results, root=0)
+    # Gather results at root process
+    gathered_averages = comm.gather(partial_averages, root=0)
 
     if rank == 0:
+        # Combine all averages
         final_results = {}
-        for result in gathered_results:
-            for category, avg in result.items():
+        for partial in gathered_averages:
+            for category, avg in partial.items():
                 if category in final_results:
                     final_results[category].append(avg)
                 else:
                     final_results[category] = [avg]
 
-        # Compute overall averages
+        # Write the final averages to output
         with open("/input/reducer_output.txt", "w") as f:
             for category, averages in final_results.items():
                 overall_avg = sum(averages) / len(averages)
                 f.write(f"{category}\t{overall_avg}\n")
-        print("Reducer completed. Output saved to /input/reducer_output.txt")
