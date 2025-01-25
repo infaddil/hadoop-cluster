@@ -1,16 +1,20 @@
 /*
- * VisualizeOutputJava.java
+ * VisualizeOutputJava.java (Corrected for Java 8)
  *
- * Reads lines from "output.txt" of the form:
- *   year <tab> averageIncome
- * Then uses JFreeChart to plot them and saves "output.png".
+ * Reads lines from "output.txt" of form "year\t averageIncome"
+ * Then uses JFreeChart line chart, saves "output.png".
  */
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
+import org.jfree.chart.JFreeChart;
 import org.jfree.data.category.DefaultCategoryDataset;
-import java.io.*;
-import java.util.*;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
 
 public class VisualizeOutputJava {
 
@@ -20,9 +24,9 @@ public class VisualizeOutputJava {
             System.exit(1);
         }
         String outputFile = args[0];
-        // load lines
-        List<Double> years = new ArrayList<>();
-        List<Double> incomes = new ArrayList<>();
+
+        ArrayList<Double> years = new ArrayList<>();
+        ArrayList<Double> incomes = new ArrayList<>();
 
         try (BufferedReader br = new BufferedReader(new FileReader(outputFile))) {
             String line;
@@ -37,7 +41,7 @@ public class VisualizeOutputJava {
                     years.add(year);
                     incomes.add(income);
                 } catch (NumberFormatException e) {
-                    // skip
+                    // skip lines that aren't "double\t double"
                 }
             }
         } catch (IOException e) {
@@ -45,23 +49,23 @@ public class VisualizeOutputJava {
             System.exit(2);
         }
 
-        // create dataset for JFreeChart
+        // Build dataset
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (int i = 0; i < years.size(); i++) {
-            double y = years.get(i);
+            double yr = years.get(i);
             double inc = incomes.get(i);
-            dataset.addValue(inc, "Income", "" + y);
+            dataset.addValue(inc, "Income", String.valueOf(yr));
         }
 
-        // create a line chart
-        var chart = ChartFactory.createLineChart(
-            "Mean Household Income over Years",
-            "Year",
-            "Income",
-            dataset
+        // Create chart
+        JFreeChart chart = ChartFactory.createLineChart(
+                "Mean Household Income over Years",
+                "Year",
+                "Income",
+                dataset
         );
 
-        // save as output.png
+        // Save chart
         try {
             ChartUtils.saveChartAsPNG(new File("output.png"), chart, 800, 600);
             System.out.println("Chart saved to output.png");
