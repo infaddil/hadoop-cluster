@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     mpich \
     openmpi-bin \
     openmpi-common \
-    libopenmpi-dev && \
+    libopenmpi-dev  \
     && rm -rf /var/lib/apt/lists/*
 
 ########################################################################
