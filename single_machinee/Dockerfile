@@ -48,7 +48,10 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
 # 4) Install python libs for your data analysis
 ########################################################################
 RUN python3 --version  # should show 3.9 now
-RUN python3 -m pip install --no-cache-dir numpy matplotlib pillow
+RUN python3 -m pip install --no-cache-dir numpy matplotlib pillow mpi4py
+
+RUN apt-get update && apt-get install -y mpich && \
+    rm -rf /var/lib/apt/lists/*
 
 ########################################################################
 # 5) Download & install Hadoop 2.7.2
