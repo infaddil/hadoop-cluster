@@ -102,10 +102,13 @@ RUN /usr/local/hadoop/bin/hdfs namenode -format
 ########################################################################
 # 10) Install MPJ Express for Java MPI + JFreeChart for charting
 ########################################################################
+# Install MPJ Express from SourceForge
 RUN wget -O mpj-v0_44.tar.gz \
     https://sourceforge.net/projects/mpjexpress/files/releases/mpj-v0_44.tar.gz/download && \
+    tar -xzf mpj-v0_44.tar.gz && \
     mv mpj-v0_44 /opt/mpj && \
     rm mpj-v0_44.tar.gz
+
 ENV MPJ_HOME=/opt/mpj
 ENV PATH="$PATH:$MPJ_HOME/bin"
 
