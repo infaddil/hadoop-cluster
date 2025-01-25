@@ -1,34 +1,24 @@
 #!/bin/bash
+# Purpose: Start a single-container Hadoop "master" from the newly built image.
 
-# the default node number is 3
-N=${1:-3}
+# 1) Remove any old container named hadoop-master
+docker rm -f hadoop-master &>/dev/null
 
+# 2) Make sure the "hadoop" bridge network exists (ignore errors if it already does)
+docker network create --driver=bridge hadoop &>/dev/null
 
-# start hadoop master container
-sudo docker rm -f hadoop-master &> /dev/null
-echo "start hadoop-master container..."
-sudo docker run -itd \
-                --net=hadoop \
-                -p 50070:50070 \
-                -p 8088:8088 \
-                --name hadoop-master \
-                --hostname hadoop-master \
-                kiwenlau/hadoop:1.0 &> /dev/null
+echo "Starting single-container hadoop-master using image my-hadoop-python39:latest..."
+docker run -itd \
+  --net=hadoop \
+  --name hadoop-master \
+  --hostname hadoop-master \
+  -p 9870:9870 \
+  -p 9000:9000 \
+  -p 8088:8088 \
+  my-hadoop-python39:latest
 
+# 3) Kick off Hadoop inside the container
+echo "Starting Hadoop inside hadoop-master..."
+docker exec -it hadoop-master bash /root/start-hadoop.sh
 
-# start hadoop slave container
-i=1
-while [ $i -lt $N ]
-do
-	sudo docker rm -f hadoop-slave$i &> /dev/null
-	echo "start hadoop-slave$i container..."
-	sudo docker run -itd \
-	                --net=hadoop \
-	                --name hadoop-slave$i \
-	                --hostname hadoop-slave$i \
-	                kiwenlau/hadoop:1.0 &> /dev/null
-	i=$(( $i + 1 ))
-done 
-
-# get into hadoop master container
-sudo docker exec -it hadoop-master bash
+echo "Done! You can now 'docker exec -it hadoop-master bash' to enter the container."
