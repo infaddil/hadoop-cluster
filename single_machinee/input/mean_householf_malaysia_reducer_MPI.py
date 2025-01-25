@@ -51,13 +51,11 @@ if __name__ == "__main__":
     gathered_results = comm.gather(partial_results, root=0)
 
     if rank == 0:
-        final_results = {}
-        for result in gathered_results:
-            for category, avg in result.items():
-                if category in final_results:
-                    final_results[category].append(avg)
-                else:
-                    final_results[category] = [avg]
+    # Combine results from all workers
+    all_results = [item for sublist in gathered_results for item in sublist]
+    with open('/input/mapped_output.txt', 'w') as f:
+        for key, value in all_results:
+            f.write(f"{key}\t{value}\n")
 
         # Compute overall averages
         with open("/input/reducer_output.txt", "w") as f:
