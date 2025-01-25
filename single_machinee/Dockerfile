@@ -16,10 +16,16 @@ WORKDIR /root
 ########################################################################
 RUN apt-get update && apt-get install -y \
     openssh-server \
+    build-essential \
     software-properties-common \
     wget \
     curl \
     vim \
+    libmpich-dev \
+    mpich \
+    openmpi-bin \
+    openmpi-common \
+    libopenmpi-dev && \
     && rm -rf /var/lib/apt/lists/*
 
 ########################################################################
