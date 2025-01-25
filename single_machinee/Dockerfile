@@ -1,5 +1,5 @@
 ########################################################################
-# Dockerfile: Hadoop 2.7.2 on Ubuntu 20.04 + Python 3.9 (default) + matplotlib
+# Dockerfile: Hadoop 2.7.2 on Ubuntu 20.04 + Python 3.9 (default) + matplotlib + MPJ Express + JFreeChart
 ########################################################################
 
 FROM ubuntu:20.04
@@ -100,6 +100,28 @@ RUN chmod +x /root/start-hadoop.sh && \
 RUN /usr/local/hadoop/bin/hdfs namenode -format
 
 ########################################################################
-# 10) CMD: start ssh, then drop into bash
+# 10) Install MPJ Express for Java MPI + JFreeChart for charting
 ########################################################################
+RUN wget http://mpj-express.org/downloads/mpj-v0_44.tar.gz && \
+    tar -xzf mpj-v0_44.tar.gz && \
+    mv mpj-v0_44 /opt/mpj && \
+    rm mpj-v0_44.tar.gz
+ENV MPJ_HOME=/opt/mpj
+ENV PATH="$PATH:$MPJ_HOME/bin"
+
+# Grab JFreeChart + jcommon jars
+RUN wget https://repo1.maven.org/maven2/org/jfree/jfreechart/1.5.4/jfreechart-1.5.4.jar && \
+    wget https://repo1.maven.org/maven2/org/jfree/jcommon/1.0.23/jcommon-1.0.23.jar
+
+########################################################################
+# 11) Copy your MPI Java source files + compile them
+########################################################################
+COPY input/MeanHouseholdMalaysiaMapperMPI.java /root/
+COPY input/MeanHouseholdMalaysiaReducerMPI.java /root/
+COPY input/VisualizeOutputJava.java /root/
+
+RUN javac -cp .:$MPJ_HOME/lib/mpj.jar:jfreechart-1.5.4.jar:jcommon-1.0.23.jar \
+    MeanHouseholdMalaysiaMapperMPI.java MeanHouseholdMalaysiaReducerMPI.java VisualizeOutputJava.java
+
+# 12) Default CMD: start SSH and drop into bash
 CMD ["sh", "-c", "service ssh start; bash"]
