@@ -54,3 +54,7 @@ if __name__ == "__main__":
         with open("/input/reducer_output.txt", "w") as f:
             for key, value in final_results.items():
                 f.write(f"{key}\t{value}\n")
+        # Display the results on the terminal
+        print("\nReducer Output:")
+        for key, value in final_results.items():
+            print(f"{key}\t{value}")
