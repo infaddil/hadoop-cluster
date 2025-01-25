@@ -1,9 +1,11 @@
 /*
- * MeanHouseholdMalaysiaReducerMPI.java (Corrected for MPJ Express + Java 8)
+ * MeanHouseholdMalaysiaReducerMPI.java
  *
- * Reads "year\tincome" lines from STDIN at rank 0, distributes them,
- * each rank partially accumulates sums by year, then Gatherv merges at rank 0,
- * final average is printed by rank 0 to STDOUT.
+ * Reads "year\tincome" lines from STDIN (rank 0),
+ * distributes them among ranks, each rank partially sums them by year,
+ * then Gatherv merges partial sums, rank 0 prints final averages.
+ *
+ * Debug prints included so you can see exactly where it might get stuck.
  */
 
 import mpi.MPI;
@@ -20,6 +22,10 @@ public class MeanHouseholdMalaysiaReducerMPI {
         int rank = MPI.COMM_WORLD.Rank();
         int size = MPI.COMM_WORLD.Size();
 
+        if (rank == 0) {
+            System.out.println("[Reducer] Rank 0: Reading lines from STDIN...");
+        }
+
         ArrayList<String> lines = new ArrayList<>();
 
         if (rank == 0) {
@@ -29,6 +35,7 @@ public class MeanHouseholdMalaysiaReducerMPI {
             while ((ln = br.readLine()) != null) {
                 lines.add(ln);
             }
+            System.out.println("[Reducer] Rank 0: Done reading " + lines.size() + " lines from STDIN.");
         }
 
         // broadcast line count
@@ -41,25 +48,42 @@ public class MeanHouseholdMalaysiaReducerMPI {
         MPI.COMM_WORLD.Bcast(totalArr, 0, 1, MPI.INT, 0);
         total = totalArr[0];
 
-        int baseCount = total / size;
-        int remainder = total % size;
-        int myCount = baseCount + ((rank < remainder) ? 1 : 0);
+        if (rank == 0) {
+            System.out.println("[Reducer] Rank 0: Broadcasting total lines=" + total);
+        }
+
+        MPI.COMM_WORLD.Barrier(); // debug
+
+        int baseCount = (total > 0) ? (total / size) : 0;
+        int remainder = (total > 0) ? (total % size) : 0;
+        int myCount = 0;
+        if (total > 0) {
+            myCount = baseCount + ((rank < remainder) ? 1 : 0);
+        }
+
+        if (rank == 0) {
+            System.out.println("[Reducer] Rank 0: baseCount=" + baseCount + ", remainder=" + remainder);
+        }
 
         ArrayList<String> localLines = new ArrayList<>();
         if (rank == 0) {
             int idx = 0;
             for (int r = 0; r < size; r++) {
-                int sendCount = baseCount + ((r < remainder) ? 1 : 0);
+                int sendCount = (total > 0) ? (baseCount + ((r < remainder) ? 1 : 0)) : 0;
                 if (r == 0) {
                     for (int i = 0; i < sendCount; i++) {
                         localLines.add(allLines[idx++]);
                     }
+                    System.out.println("[Reducer] Rank 0: Took " + sendCount + " lines for myself.");
                 } else {
                     String[] subset = new String[sendCount];
                     for (int i = 0; i < sendCount; i++) {
                         subset[i] = allLines[idx++];
                     }
-                    MPI.COMM_WORLD.Send(subset, 0, sendCount, MPI.OBJECT, r, 77);
+                    if (sendCount > 0) {
+                        MPI.COMM_WORLD.Send(subset, 0, sendCount, MPI.OBJECT, r, 77);
+                        System.out.println("[Reducer] Rank 0: Sent " + sendCount + " lines to rank " + r);
+                    }
                 }
             }
         } else {
@@ -69,10 +93,14 @@ public class MeanHouseholdMalaysiaReducerMPI {
                 for (String s : subset) {
                     localLines.add(s);
                 }
+                System.out.println("[Reducer] Rank " + rank + ": Received " + myCount + " lines.");
             }
         }
 
-        // local reduce: sum by year
+        MPI.COMM_WORLD.Barrier();
+        System.out.println("[Reducer] Rank " + rank + ": localLines.size()=" + localLines.size());
+
+        // partial reduce: sum by year
         // lines are "year\tincome"
         HashMap<String, Double> sumMap = new HashMap<>();
         HashMap<String, Integer> countMap = new HashMap<>();
@@ -86,11 +114,11 @@ public class MeanHouseholdMalaysiaReducerMPI {
                 sumMap.put(year, sumMap.getOrDefault(year, 0.0) + inc);
                 countMap.put(year, countMap.getOrDefault(year, 0) + 1);
             } catch (NumberFormatException e) {
-                // ignore
+                // skip
             }
         }
 
-        // Convert partial results to an array of "year\t sum \t count"
+        // Convert partial results to array of "year\t sum \t count"
         ArrayList<String> partialList = new ArrayList<>();
         for (String y : sumMap.keySet()) {
             double s = sumMap.get(y);
@@ -101,7 +129,7 @@ public class MeanHouseholdMalaysiaReducerMPI {
         String[] localArray = partialList.toArray(new String[0]);
         int localLen = localArray.length;
 
-        // gather counts
+        // gather lengths
         int[] sendCountArr = new int[1];
         sendCountArr[0] = localLen;
         int[] recvCounts = new int[size];
@@ -117,6 +145,7 @@ public class MeanHouseholdMalaysiaReducerMPI {
                 displs[r] = totalGather;
                 totalGather += recvCounts[r];
             }
+            System.out.println("[Reducer] Rank 0: totalGather for final partial results = " + totalGather);
         }
 
         String[] reduceOutputs = null;
@@ -125,11 +154,14 @@ public class MeanHouseholdMalaysiaReducerMPI {
         }
 
         MPI.COMM_WORLD.Gatherv(localArray, 0, localLen, MPI.OBJECT,
-                               reduceOutputs, 0, recvCounts, displs, MPI.OBJECT,
-                               0);
+                               reduceOutputs, 0, recvCounts, displs, MPI.OBJECT, 0);
+
+        MPI.COMM_WORLD.Barrier();
 
         if (rank == 0 && reduceOutputs != null) {
-            // combine final results
+            System.out.println("[Reducer] Rank 0: Gathering partial sums. We have " + reduceOutputs.length + " lines total.");
+
+            // final combine
             HashMap<String, Double> globalSum = new HashMap<>();
             HashMap<String, Integer> globalCount = new HashMap<>();
 
@@ -144,11 +176,13 @@ public class MeanHouseholdMalaysiaReducerMPI {
                 globalCount.put(yy, globalCount.getOrDefault(yy, 0) + c);
             }
 
-            // print final average
+            // final printing
+            System.out.println("[Reducer] Rank 0: Final results:");
             for (String year : globalSum.keySet()) {
                 double sumVal = globalSum.get(year);
                 int cc = globalCount.get(year);
                 double avg = sumVal / cc;
+                // print to stdout
                 System.out.println(year + "\t" + avg);
             }
         }
