@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: mpi-container
-        image: infaddil/hadoop-cluster-mpi:latest # Your Docker image
+        image: intansaidatul/hadoop-cluster-mpi:latest # Your Docker image
         command: ["/bin/bash", "-c", "--"]
         args: ["while true; do sleep 30; done;"] # Keeps container alive for MPI jobs
         ports:
