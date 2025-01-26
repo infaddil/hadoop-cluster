@@ -135,8 +135,6 @@ COPY input/input_mean_household_malaysia.csv /root/
 COPY input/mean_household_malaysia_mapper.py /root
 COPY input/mean_household_malaysia_reducer.py /root
 
-RUN javac -cp .:$MPJ_HOME/lib/mpj.jar:jfreechart-1.5.4.jar:jcommon-1.0.23.jar \
-    MeanHouseholdMalaysiaMapperMPI.java MeanHouseholdMalaysiaReducerMPI.java VisualizeOutputJava.java
 
 # 12) Default CMD: start SSH and drop into bash
 CMD ["sh", "-c", "service ssh start; bash"]
