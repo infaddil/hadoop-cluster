@@ -8,7 +8,6 @@ data:
     mpi-pod-0 slots=2
     mpi-pod-1 slots=2
     mpi-pod-2 slots=2
-    mpi-pod-3 slots=2
 
 ---
 apiVersion: apps/v1
