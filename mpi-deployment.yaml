@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mpi-cluster
+  labels:
+    app: mpi
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: mpi
+  template:
+    metadata:
+      labels:
+        app: mpi
+    spec:
+      containers:
+      - name: mpi-worker
+        image: infaddil/hadoop-cluster-mpi:latest # Replace with your built Docker image
+        command: ["/bin/bash", "-c", "--"]
+        args: ["while true; do sleep 30; done;"] # Keeps the container alive for MPI jobs
+        ports:
+        - containerPort: 22 # SSH port for MPI communication
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+      - name: mpi-master
+        image: infaddil/hadoop-cluster-mpi:latest
+        command: ["/bin/bash", "-c", "--"]
+        args:
+          - >
+            service ssh start &&
+            mpirun --hostfile /etc/mpi/hostfile -np 4
+            python3 /path/to/your/main/mpi_script.py;
+            while true; do sleep 30; done;
+        ports:
+        - containerPort: 22
+        resources:
+          limits:
+            memory: "4Gi"
+            cpu: "4"
+      restartPolicy: Always
